@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>１０マス計算</title>
+  <style>
+    body {
+      font-family: "Arial", "メイリオ", sans-serif;
+      background-color: #f2f2f2;
+      color: #333;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      background-color: #0066cc;
+      color: white;
+      padding: 10px;
+      margin: 0;
+    }
+    .controls {
+      margin: 10px;
+    }
+    .controls select {
+      font-size: 18px;
+      padding: 5px;
+    }
+    .container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      padding: 10px;
+    }
+
+    /* ↓ 各10マス計算表：2行×11列（見出し1行＋入力1行） */
+    .grid-column {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-right: 20px;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(11, 72px);
+      grid-template-rows: repeat(2, 57px); /* 見出し＋1行の入力 */
+      gap: 2px;
+    }
+
+    .grid-container .label {
+      background-color: #e0f0ff;
+      font-weight: bold;
+      font-size: 32px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #ccc;
+    }
+
+    .grid-container .cell {
+      width: 70px;
+      height: 55px;
+      font-size: 32px;
+      text-align: center;
+      line-height: 55px;
+      border: 1px solid #ccc;
+      background-color: white;
+      user-select: none;
+    }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+      height: 550px;
+    }
+
+    .keypad button {
+      font-size: 28px;
+      border-radius: 8px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .keypad button:hover {
+      background-color: #45a049;
+    }
+
+    .stats {
+      width: 100%;
+      max-width: 95vw;
+      padding: 10px;
+      margin: 0 auto;
+    }
+
+    .cell[data-enabled="false"],
+    .cell.disabled {
+      background-color: #ccc;
+      color: #666;
+      pointer-events: none;
+    }
+
+    canvas {
+      width: 100% !important;
+      max-width: 100%;
+      height: 550px !important;
+    }
+
+    #start-container {
+      text-align: center;
+      margin: 10px;
+    }
+
+    #start-button {
+      font-size: 24px;
+      padding: 10px 30px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .cell.selected {
+      background-color: #00bfff !important;
+    }
+  </style>
+</head>
+<body>
+  <h1>１０マス計算</h1>
+
+  <div class="controls">
+  <label for="mode">計算種別: </label>
+  <select id="mode" onchange="changeMode(this.value)">
+    <option value="add">たし算</option>
+    <option value="sub">ひき算</option>
+    <option value="mul">かけ算</option>
+  </select>
+
+  <!-- だん選択欄を追加 -->
+  <label for="dan" style="margin-left: 20px;">だん: </label>
+  <select id="dan" onchange="changeDan(this.value)">
+    <option value="various">いろいろ</option>
+    <option value="1">１</option>
+    <option value="2">２</option>
+    <option value="3">３</option>
+    <option value="4">４</option>
+    <option value="5">５</option>
+    <option value="6">６</option>
+    <option value="7">７</option>
+    <option value="8">８</option>
+    <option value="9">９</option>
+  </select>
+</div>
+  <div id="start-container">
+    <button id="start-button">スタート</button>
+  </div>
+
+  <div class="container">
+    <div class="grid-column">
+      <!-- 5セットの10マス計算表 -->
+      <div id="grid0" class="grid-container"></div>
+      <div id="grid1" class="grid-container"></div>
+      <div id="grid2" class="grid-container"></div>
+      <div id="grid3" class="grid-container"></div>
+      <div id="grid4" class="grid-container"></div>
+    </div>
+    <div>
+      <div id="timer" style="font-size: 24px; margin-bottom: 10px;">残り時間: 180 秒</div>
+      <div class="keypad" id="keypad"></div>
+      <p id="score" style="font-size: 24px; margin-top: 10px;">正解数: 0</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <p id="page">ページ: 1 / 5</p>
+    <canvas id="chart"></canvas>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const grid = document.getElementById("grid");
+  const keypad = document.getElementById("keypad");
+  const timerEl = document.getElementById("timer");
+  const scoreEl = document.getElementById("score");
+  const pageEl = document.getElementById("page");
+  const chartEl = document.getElementById("chart");
+  const modeSelector = document.getElementById("mode");
+
+  let timeLeft = 180, timer, currentPage = 1, totalPages = 5;
+  let mode = "add";
+  let rowHeaders = [];
+  let colHeaders = [];
+  let currentInputIndex = 0, correctCount = 0;
+  let cells = [], currentAnswer = "";
+  let gameStarted = false;
+  let colHeadersList = [];  // ← 新たに追加。5つの表それぞれに列見出しを持たせる
+  let dan = "various";  // 初期値：ランダム
+
+function changeDan(newDan) {
+  dan = newDan;
+  currentPage = 1;
+  correctCount = 0;
+  timeLeft = 180;
+  clearInterval(timer);
+  startGame(true);
+}
+
+  function shuffle(array) {
+    return array.sort(() => Math.random() - 0.5);
+  }
+
+  function changeMode(newMode) {
+    mode = newMode;
+    currentPage = 1;
+    correctCount = 0;
+    timeLeft = 180;
+    clearInterval(timer);
+    startGame(true);
+  }
+
+  function startGame(reset = false) {
+  if (mode === "sub") {
+    colHeadersList = [...Array(5)].map(() =>
+      shuffle([...Array(10).keys()].map(i => i + 10))
+    );
+  } else {
+    colHeadersList = [...Array(5)].map(() =>
+      shuffle([...Array(10).keys()])
+    );
+  }
+
+  if (dan === "various") {
+    rowHeaders = shuffle([...Array(10).keys()]).slice(0, 5); // ランダム
+  } else {
+    const danNum = parseInt(dan);
+    rowHeaders = Array(5).fill(danNum); // 同じ数字で5セット
+  }
+
+  buildGrid();
+  currentInputIndex = 0;
+
+  if (reset) {
+    correctCount = 0;
+    timeLeft = 180;
+  }
+
+  timerEl.textContent = `残り時間: ${formatTime(timeLeft)}`;
+  scoreEl.textContent = `正解数: ${correctCount}`;
+  pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
+  drawChart();
+  updateCurrentCellDisplay();
+  if (gameStarted) {
+    enableCurrentCellOnly();
+    cells.forEach(cell => {
+      cell.style.backgroundColor = "white";
+    });
+  }
+}
+
+  function buildGrid() {
+  cells = [];
+
+  for (let g = 0; g < 5; g++) {
+    const grid = document.getElementById(`grid${g}`);
+    grid.innerHTML = "";
+
+    const rowHeader = rowHeaders[g];
+    const colHeaders = colHeadersList[g];
+
+    // ラベル行
+    for (let j = 0; j <= 10; j++) {
+      const div = document.createElement("div");
+      div.className = "label";
+      div.textContent = j === 0 ? (mode === "add" ? "+" : mode === "sub" ? "−" : "×") : colHeaders[j - 1];
+      grid.appendChild(div);
+    }
+
+    // 入力行
+    for (let j = 0; j <= 10; j++) {
+      const div = document.createElement("div");
+      if (j === 0) {
+        div.className = "label";
+        div.textContent = rowHeader;
+      } else {
+        div.className = "cell";
+        div.dataset.row = rowHeader;
+        div.dataset.col = colHeaders[j - 1];
+        div.dataset.enabled = "false";
+        div.classList.add("disabled");
+        div.onclick = () => {
+          if (div.dataset.enabled !== "true") return;
+          currentInputIndex = cells.indexOf(div);
+          currentAnswer = "";
+          updateCurrentCellDisplay();
+        };
+        cells.push(div);
+      }
+      grid.appendChild(div);
+    }
+  }
+}
+
+
+  function updateCurrentCellDisplay() {
+    cells.forEach(cell => cell.classList.remove("selected"));
+    const cell = cells[currentInputIndex];
+    if (cell && cell.dataset.enabled === "true") {
+      cell.classList.add("selected");
+      cell.textContent = currentAnswer;
+    }
+  }
+
+  function enableCurrentCellOnly() {
+    cells.forEach(cell => {
+      cell.dataset.enabled = "false";
+      cell.classList.add("disabled");
+      cell.classList.remove("selected");
+    });
+
+    const cell = cells[currentInputIndex];
+    if (cell) {
+      cell.dataset.enabled = "true";
+      cell.classList.remove("disabled");
+      cell.classList.add("selected");
+    }
+  }
+
+  function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}分${secs.toString().padStart(2, '0')}秒`;
+  }
+
+  function startTimer() {
+    timer = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = `残り時間: ${formatTime(timeLeft)}`;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        finishGame();
+      }
+    }, 1000);
+  }
+
+  function nextInput() {
+    const cell = cells[currentInputIndex];
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    let result = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
+
+    if (parseInt(currentAnswer) === result) {
+      correctCount++;
+      scoreEl.textContent = `正解数: ${correctCount}`;
+    }
+
+    cell.textContent = currentAnswer;
+    currentInputIndex++;
+    currentAnswer = "";
+
+    if (currentInputIndex < cells.length) {
+      enableCurrentCellOnly();
+      updateCurrentCellDisplay();
+    } else {
+      if (currentPage < totalPages) {
+        currentPage++;
+        pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
+        startGame(false);
+      } else {
+        finishGame();
+      }
+    }
+  }
+
+  function handleInput(char) {
+    if (currentAnswer.length >= 2) return;
+
+    currentAnswer += char;
+    updateCurrentCellDisplay();
+
+    const cell = cells[currentInputIndex];
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    const answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
+
+    const isCorrect = parseInt(currentAnswer) === answer;
+
+    if (isCorrect) {
+      nextInput();
+    } else {
+      const wrongInput = currentAnswer;
+      const correctLength = answer.toString().length;
+      if (
+        currentAnswer.length === correctLength ||
+        (correctLength === 1 && currentAnswer.length === 2)
+      ) {
+        setTimeout(() => {
+          if (currentAnswer === wrongInput) {
+            currentAnswer = "";
+            updateCurrentCellDisplay();
+          }
+        }, 100);
+      }
+    }
+  }
+
+  function finishGame() {
+  gameStarted = false;
+  cells.forEach(cell => {
+    cell.dataset.enabled = "false";
+    cell.classList.remove("selected");
+    cell.classList.add("disabled");
+    cell.style.backgroundColor = "#ccc"; // グレー
+  });
+
+  saveResult();
+  drawChart();
+}
+
+  function saveResult() {
+    const key = `records_${mode}`;
+    const data = JSON.parse(localStorage.getItem(key) || "[]");
+    data.push(correctCount);
+    localStorage.setItem(key, JSON.stringify(data.slice(-100)));
+  }
+
+  function drawChart() {
+    const key = `records_${mode}`;
+    const data = JSON.parse(localStorage.getItem(key) || "[]");
+    const ctx = chartEl.getContext("2d");
+    if (window.resultChart) window.resultChart.destroy();
+    window.resultChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map((_, i) => i + 1),
+        datasets: [{
+          label: mode === "add" ? "たしざんの記録" : mode === "sub" ? "ひきざんの記録" : "かけざんの記録",
+          data,
+          backgroundColor: '#ffcc00',
+          borderColor: '#ff9900',
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { suggestedMax: 120 } }
+      }
+    });
+  }
+
+  function createKeypad() {
+    keypad.innerHTML = "";
+    const layout = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "⌫", "Enter"];
+    layout.forEach(char => {
+      const btn = document.createElement("button");
+      btn.textContent = char;
+      btn.dataset.key = char;
+      keypad.appendChild(btn);
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const cell = cells[currentInputIndex];
+    if (!cell || cell.dataset.enabled !== "true") return;
+
+    if (e.key >= "0" && e.key <= "9") {
+      handleInput(e.key);
+    } else if (e.key === "Backspace") {
+      currentAnswer = currentAnswer.slice(0, -1);
+      updateCurrentCellDisplay();
+    } else if (e.key === "Enter") {
+      nextInput();
+    }
+  });
+
+  keypad.addEventListener("click", (e) => {
+    const cell = cells[currentInputIndex];
+    if (!cell || cell.dataset.enabled !== "true") return;
+
+    const key = e.target.dataset.key;
+    if (!key) return;
+
+    if (key === "⌫") {
+      currentAnswer = currentAnswer.slice(0, -1);
+      updateCurrentCellDisplay();
+    } else if (key === "Enter") {
+      nextInput();
+    } else {
+      handleInput(key);
+    }
+  });
+
+  document.getElementById('start-button').addEventListener('click', () => {
+  // スタート時にすべてのセルの色を白に戻す
+  cells.forEach(cell => {
+    cell.style.backgroundColor = "white";
+  });
+
+  gameStarted = true;
+  startTimer();
+  document.getElementById('start-container').style.display = 'none';
+  enableCurrentCellOnly();
+  updateCurrentCellDisplay();
+});
+
+  createKeypad();
+  startGame(true);
+</script>
+
+
+
+
+</body>
+</html>

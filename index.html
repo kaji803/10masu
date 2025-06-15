@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>１０マス計算</title>
+  <title>１０マスけいさん</title>
   <style>
     body {
       font-family: "Arial", "メイリオ", sans-serif;
@@ -75,7 +75,7 @@
       grid-template-rows: repeat(4, 1fr);
       gap: 10px;
       margin-top: 10px;
-      height: 550px;
+      height: 522.5px;
     }
 
     .keypad button {
@@ -131,17 +131,45 @@
     .cell.selected {
       background-color: #00bfff !important;
     }
+    
+    #message-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff8dc;
+    border: 3px solid #ffa500;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    text-align: center;
+    z-index: 9999;
+    font-family: "メイリオ", sans-serif;
+    display: none;
+  }
+
+  #message-box h2 {
+    font-size: 36px;
+    color: #ff6600;
+    margin-bottom: 20px;
+  }
+
+  #message-box p {
+    font-size: 28px;
+    color: #333;
+    margin: 10px 0;
+  }
   </style>
 </head>
 <body>
-  <h1>１０マス計算</h1>
+  <h1>１０マスけいさん</h1>
 
   <div class="controls">
-  <label for="mode">計算種別: </label>
+  <label for="mode">しゅるい: </label>
   <select id="mode" onchange="changeMode(this.value)">
-    <option value="add">たし算</option>
-    <option value="sub">ひき算</option>
-    <option value="mul">かけ算</option>
+    <option value="add">たしざん</option>
+    <option value="sub">ひきざん</option>
+    <option value="mul">かけざん</option>
   </select>
 
   <!-- だん選択欄を追加 -->
@@ -165,17 +193,16 @@
 
   <div class="container">
     <div class="grid-column">
-      <!-- 5セットの10マス計算表 -->
+      <div style="height: 34px;"></div> <!-- ← 追加 -->
       <div id="grid0" class="grid-container"></div>
       <div id="grid1" class="grid-container"></div>
       <div id="grid2" class="grid-container"></div>
       <div id="grid3" class="grid-container"></div>
-      <div id="grid4" class="grid-container"></div>
     </div>
     <div>
-      <div id="timer" style="font-size: 24px; margin-bottom: 10px;">残り時間: 180 秒</div>
+      <div id="timer" style="font-size: 24px; margin-bottom: 10px;">のこり: 180 びょう</div>
       <div class="keypad" id="keypad"></div>
-      <p id="score" style="font-size: 24px; margin-top: 10px;">正解数: 0</p>
+      <p id="score" style="font-size: 24px; margin-top: 10px;">せいかいすう: 0</p>
     </div>
   </div>
 
@@ -228,20 +255,20 @@ function changeDan(newDan) {
 
   function startGame(reset = false) {
   if (mode === "sub") {
-    colHeadersList = [...Array(5)].map(() =>
+    colHeadersList = [...Array(4)].map(() =>
       shuffle([...Array(10).keys()].map(i => i + 10))
     );
   } else {
-    colHeadersList = [...Array(5)].map(() =>
+    colHeadersList = [...Array(4)].map(() =>
       shuffle([...Array(10).keys()])
     );
   }
 
   if (dan === "various") {
-    rowHeaders = shuffle([...Array(10).keys()]).slice(0, 5); // ランダム
+    rowHeaders = shuffle([...Array(10).keys()]).slice(0, 4); // ランダム
   } else {
     const danNum = parseInt(dan);
-    rowHeaders = Array(5).fill(danNum); // 同じ数字で5セット
+    rowHeaders = Array(4).fill(danNum); // 同じ数字で5セット
   }
 
   buildGrid();
@@ -252,8 +279,8 @@ function changeDan(newDan) {
     timeLeft = 180;
   }
 
-  timerEl.textContent = `残り時間: ${formatTime(timeLeft)}`;
-  scoreEl.textContent = `正解数: ${correctCount}`;
+  timerEl.textContent = `のこり: ${formatTime(timeLeft)}`;
+  scoreEl.textContent = `せいかいすう: ${correctCount}`;
   pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
   drawChart();
   updateCurrentCellDisplay();
@@ -268,7 +295,7 @@ function changeDan(newDan) {
   function buildGrid() {
   cells = [];
 
-  for (let g = 0; g < 5; g++) {
+  for (let g = 0; g < 4; g++) {
     const grid = document.getElementById(`grid${g}`);
     grid.innerHTML = "";
 
@@ -336,13 +363,13 @@ function changeDan(newDan) {
   function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${minutes}分${secs.toString().padStart(2, '0')}秒`;
+    return `${minutes}ふん${secs.toString().padStart(2, '0')}びょう`;
   }
 
   function startTimer() {
     timer = setInterval(() => {
       timeLeft--;
-      timerEl.textContent = `残り時間: ${formatTime(timeLeft)}`;
+      timerEl.textContent = `のこり: ${formatTime(timeLeft)}`;
       if (timeLeft <= 0) {
         clearInterval(timer);
         finishGame();
@@ -358,7 +385,7 @@ function changeDan(newDan) {
 
     if (parseInt(currentAnswer) === result) {
       correctCount++;
-      scoreEl.textContent = `正解数: ${correctCount}`;
+      scoreEl.textContent = `せいかいすう: ${correctCount}`;
     }
 
     cell.textContent = currentAnswer;
@@ -422,39 +449,49 @@ function changeDan(newDan) {
 
   saveResult();
   drawChart();
+
+  const messageEl = document.getElementById("message");
+  messageEl.textContent = `よくがんばりました！\nきょうの あなたのきろくは、\n${correctCount}もんです！`;
+  messageEl.style.display = "block";
 }
 
   function saveResult() {
-    const key = `records_${mode}`;
-    const data = JSON.parse(localStorage.getItem(key) || "[]");
-    data.push(correctCount);
-    localStorage.setItem(key, JSON.stringify(data.slice(-100)));
-  }
+  const key = `records_${mode}_${dan}`;
+  const data = JSON.parse(localStorage.getItem(key) || "[]");
+  data.push(correctCount);
+  localStorage.setItem(key, JSON.stringify(data.slice(-100)));
+}
 
   function drawChart() {
-    const key = `records_${mode}`;
-    const data = JSON.parse(localStorage.getItem(key) || "[]");
-    const ctx = chartEl.getContext("2d");
-    if (window.resultChart) window.resultChart.destroy();
-    window.resultChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map((_, i) => i + 1),
-        datasets: [{
-          label: mode === "add" ? "たしざんの記録" : mode === "sub" ? "ひきざんの記録" : "かけざんの記録",
-          data,
-          backgroundColor: '#ffcc00',
-          borderColor: '#ff9900',
-          borderWidth: 2,
-          fill: false
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { suggestedMax: 120 } }
-      }
-    });
-  }
+  const key = `records_${mode}_${dan}`;
+  const data = JSON.parse(localStorage.getItem(key) || "[]");
+  const ctx = chartEl.getContext("2d");
+
+  // ラベル作成：モード＋だん
+  const modeLabel = mode === "add" ? "たしざん" : mode === "sub" ? "ひきざん" : "かけざん";
+  const danLabel = dan === "various" ? "いろいろ" : `${dan}のだん`;
+  const label = `${modeLabel}の${danLabel}のきろく`;
+
+  if (window.resultChart) window.resultChart.destroy();
+  window.resultChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map((_, i) => i + 1),
+      datasets: [{
+        label,
+        data,
+        backgroundColor: '#ffcc00',
+        borderColor: '#ff9900',
+        borderWidth: 2,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { suggestedMax: 120 } }
+    }
+  });
+}
 
   function createKeypad() {
     keypad.innerHTML = "";
@@ -517,6 +554,31 @@ function changeDan(newDan) {
 
 
 
+<div id="message-box">
+  <h2>よくがんばりました！</h2>
+  <p>きょうの あなたのきろくは、</p>
+  <p><span id="final-score" style="font-size: 40px; font-weight: bold;"></span> もんです！</p>
+</div>
 
+<div id="message" style="
+  display: none;
+  position: fixed;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #fff8dc;
+  border: 4px solid #ff9900;
+  border-radius: 20px;
+  padding: 30px;
+  font-size: 32px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 0 20px rgba(0,0,0,0.2);
+  z-index: 9999;
+  max-width: 80%;
+  text-align: center;
+  line-height: 1.6;
+">
+</div>
 </body>
 </html>

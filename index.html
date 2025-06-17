@@ -449,9 +449,8 @@ function changeDan(newDan) {
 
   saveResult();
   drawChart();
-
   const messageEl = document.getElementById("message");
-  messageEl.textContent = `よくがんばりました！\nきょうの あなたのきろくは、\n${correctCount}もんです！`;
+  messageEl.innerHTML = `よくがんばりました！<br>きょうの あなたのきろくは、<br>${correctCount}もんです！`;
   messageEl.style.display = "block";
 }
 
